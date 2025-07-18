@@ -1,6 +1,6 @@
 data_testing/
 data/
-output/
+3td_output/
 temp_zips/
 __pycache__/
 .venv/
