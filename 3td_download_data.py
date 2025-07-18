@@ -7,7 +7,7 @@ import requests
 
 URLS_FILE = "urls.txt"
 ZIP_DIR = "temp_zips"
-EXTRACT_DIR = "data"
+EXTRACT_DIR = "3td_data"
 
 def download_zip(url, dest_folder):
     local_filename = os.path.join(dest_folder, url.split("/")[-1] or "file.zip")

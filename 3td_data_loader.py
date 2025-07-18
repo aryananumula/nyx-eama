@@ -335,7 +335,7 @@ class C3DDataLoader:
                     count = len(df[df['error'] == error])
                     print(f"  - {error}: {count} files")
 
-    def save_data(self, data: Dict[str, pd.DataFrame], output_dir: str = "output") -> None:
+    def save_data(self, data: Dict[str, pd.DataFrame], output_dir: str = "3td_output") -> None:
         """
         Save all DataFrames to CSV files.
 

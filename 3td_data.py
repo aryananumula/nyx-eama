@@ -4,7 +4,7 @@ import pandas as pd
 
 
 def load_data():
-    output_dir = Path("output")
+    output_dir = Path("3td_output")
 
     if not output_dir.exists():
         print("Output directory not found.")
@@ -67,9 +67,3 @@ def main():
 
 if __name__ == "__main__":
     points, analogs, metadata = main()
-    if points is not None:
-        print(f"\nTotal points data: {len(points):,} rows")
-    if analogs is not None:
-        print(f"Total analogs data: {len(analogs):,} rows")
-    if metadata is not None:
-        print(f"Total metadata: {len(metadata)} rows")
