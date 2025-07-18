@@ -1,0 +1,10 @@
+data_testing/
+data/
+output/
+temp_zips/
+__pycache__/
+.venv/
+env/
+.DS_Store
+.DS_Store?
+*.csv
