@@ -1,6 +1,8 @@
 data_testing/
 3td_data/
 data/
+thetis_data/
+thetis_output/
 3td_output/
 temp_zips/
 __pycache__/
