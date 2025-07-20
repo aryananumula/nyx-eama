@@ -1,8 +1,10 @@
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 import pandas as pd
+import torch
 
 def extract_joint_angles(data):
+    data = ensure_numpy(data)  # Ensure compatibility with PyTorch tensors
     angles = {}
     for joint in data.columns:
         if 'joint' in joint:
@@ -16,6 +18,7 @@ def calculate_joint_angle(joint_data):
     return np.random.rand(len(joint_data))  # Replace with actual computation
 
 def extract_limb_velocities(data):
+    data = ensure_numpy(data)  # Ensure compatibility with PyTorch tensors
     velocities = {}
     for limb in data.columns:
         if 'limb' in limb:
@@ -39,3 +42,12 @@ def perform_causal_analysis(features):
 def analyze_causality(feature_data):
     # Placeholder for actual causality analysis
     return np.random.rand()  # Replace with actual analysis logic
+
+def ensure_numpy(data):
+    """
+    Ensures the input data is a numpy array or pandas DataFrame.
+    Converts PyTorch tensors to numpy arrays if necessary.
+    """
+    if isinstance(data, torch.Tensor):
+        return data.detach().cpu().numpy()
+    return data
