@@ -1,24 +1,45 @@
 from pathlib import Path
 import pandas as pd
-from models.action_recognition import ActionRecognitionModel
-from models.feature_extraction import extract_features
+from models.action_recognition import create_vit_model, evaluate_model
+from models.feature_extraction import extract_joint_angles, extract_limb_velocities
 from feedback.llm_feedback import generate_feedback
+import torch
 
 def run_pipeline():
     # Load data
     data = load_data()
     if data is None:
-        return
+        return None, None
 
     # Extract features
-    features = extract_features(data)
-    
+    features = {}
+    for key, df in data.items():
+        joint_angles = extract_joint_angles(df)
+        limb_velocities = extract_limb_velocities(df)
+        features[key] = {**joint_angles, **limb_velocities}
+
     # Classify strokes
-    model = ActionRecognitionModel()
-    predictions = model.classify(features)
+    input_shape = (3, 224, 224)  # Example input shape, adjust as needed
+    num_classes = 5  # Example number of classes, adjust as needed
+    model = create_vit_model(input_shape, num_classes)
+
+    # Load a pre-trained model or train the model here
+    # For now, we'll assume the model is already trained
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    predictions = {}
+    for key, feature_set in features.items():
+        # Convert features to a tensor (example, adjust as needed)
+        feature_tensor = torch.tensor(list(feature_set.values()), dtype=torch.float32).to(device)
+        model.eval()
+        with torch.no_grad():
+            outputs = model(feature_tensor.unsqueeze(0))  # Add batch dimension
+            _, predicted = torch.max(outputs, 1)
+            predictions[key] = predicted.item()
 
     # Generate feedback
-    feedback = generate_feedback(predictions)
+    feedback = {}
+    for key, prediction in predictions.items():
+        feedback[key] = generate_feedback(prediction)
 
     return predictions, feedback
 
