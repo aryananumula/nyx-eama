@@ -1,4 +1,4 @@
-# Tennis Stroke Classification Project
+# Talking Tennis: Causal Language Feedback from 3D Biomechanical Action Recognition
 
 This project aims to develop a pipeline for classifying tennis strokes using 3D motion data. The pipeline incorporates components for data loading, feature extraction, action recognition, and feedback generation using a large language model (LLM).
 
@@ -45,7 +45,7 @@ This project aims to develop a pipeline for classifying tennis strokes using 3D 
 
 2. Install the required dependencies:
    ```
-   pip install -r requirements.txt
+   pip install -r pyproject.txt
    ```
 
 3. Download the necessary datasets using the `thetis_download.py` script.
@@ -56,8 +56,5 @@ This project aims to develop a pipeline for classifying tennis strokes using 3D 
 
 - Use the `exploration.ipynb` notebook for exploratory data analysis and visualizations.
 - Modify the `pipeline.py` script to customize the workflow as needed.
-- Refer to the `data/README.md` for detailed information about the datasets used in the project.
+- Refer to the `dataset-readme/README.md` for detailed information about the datasets used in the project.
 
-## Contributing
-
-Contributions are welcome! Please submit a pull request or open an issue for any suggestions or improvements.
