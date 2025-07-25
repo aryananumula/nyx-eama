@@ -57,4 +57,3 @@ This project aims to develop a pipeline for classifying tennis strokes using 3D 
 - Use the `exploration.ipynb` notebook for exploratory data analysis and visualizations.
 - Modify the `pipeline.py` script to customize the workflow as needed.
 - Refer to the `dataset-readme/README.md` for detailed information about the datasets used in the project.
-

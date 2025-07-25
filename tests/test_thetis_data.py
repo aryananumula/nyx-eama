@@ -27,7 +27,7 @@ def test_explore_data_valid():
         'stroke1': pd.DataFrame({'column1': [1, 2], 'column2': [3, 4]}),
         'stroke2': pd.DataFrame({'column1': [5, 6], 'column2': [7, 8]})
     }
-    
+
     explore_data(mock_data)  # Should print information about the datasets
 
     # Since we are not capturing print output, we cannot assert on printed values directly.
