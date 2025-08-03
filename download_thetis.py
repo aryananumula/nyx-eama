@@ -125,74 +125,6 @@ def load_thetis_motion_data():
     
     return data_samples
 
-def create_sample_thetis_data():
-    """
-    Create sample THETIS-like data for testing if real data isn't available
-    """
-    print("Creating sample THETIS-like motion data...")
-    
-    # Create realistic tennis motion data samples
-    samples = {}
-    
-    stroke_types = ['fh', 'bh', 'fhb', 'bhb', 'fhvb', 'bhvb']  # forehand, backhand, volleys
-    players = ['tp1', 'tp2', 'tp3']
-    
-    for player in players:
-        for stroke in stroke_types:
-            sample_name = f"{player}_{stroke}_sample"
-            
-            # Create motion data with realistic tennis joint movements
-            frames = np.random.randint(80, 150)  # Variable stroke duration
-            
-            # THETIS-like column structure (simplified)
-            joint_names = [
-                'Head_X', 'Head_Y', 'Head_Z',
-                'Neck_X', 'Neck_Y', 'Neck_Z',
-                'SpineShoulder_X', 'SpineShoulder_Y', 'SpineShoulder_Z',
-                'ShoulderLeft_X', 'ShoulderLeft_Y', 'ShoulderLeft_Z',
-                'ShoulderRight_X', 'ShoulderRight_Y', 'ShoulderRight_Z',
-                'ElbowLeft_X', 'ElbowLeft_Y', 'ElbowLeft_Z',
-                'ElbowRight_X', 'ElbowRight_Y', 'ElbowRight_Z',
-                'WristLeft_X', 'WristLeft_Y', 'WristLeft_Z',
-                'WristRight_X', 'WristRight_Y', 'WristRight_Z',
-                'HandLeft_X', 'HandLeft_Y', 'HandLeft_Z',
-                'HandRight_X', 'HandRight_Y', 'HandRight_Z',
-                'SpineBase_X', 'SpineBase_Y', 'SpineBase_Z',
-                'HipLeft_X', 'HipLeft_Y', 'HipLeft_Z',
-                'HipRight_X', 'HipRight_Y', 'HipRight_Z',
-                'KneeLeft_X', 'KneeLeft_Y', 'KneeLeft_Z',
-                'KneeRight_X', 'KneeRight_Y', 'KneeRight_Z',
-                'AnkleLeft_X', 'AnkleLeft_Y', 'AnkleLeft_Z',
-                'AnkleRight_X', 'AnkleRight_Y', 'AnkleRight_Z',
-                'FootLeft_X', 'FootLeft_Y', 'FootLeft_Z',
-                'FootRight_X', 'FootRight_Y', 'FootRight_Z'
-            ]
-            
-            # Generate realistic motion data
-            data = {}
-            for joint_name in joint_names:
-                if 'Right' in joint_name and any(s in stroke for s in ['fh', 'bh']):
-                    # More movement for dominant hand strokes
-                    base_val = np.random.randn() * 0.5
-                    movement = np.linspace(0, 2, frames) + np.random.randn(frames) * 0.1
-                    data[joint_name] = base_val + movement
-                else:
-                    # Less movement for other joints
-                    base_val = np.random.randn() * 0.3
-                    data[joint_name] = base_val + np.random.randn(frames) * 0.05
-            
-            samples[sample_name] = pd.DataFrame(data)
-    
-    # Save sample data
-    output_dir = "thetis_output"
-    os.makedirs(output_dir, exist_ok=True)
-    
-    for name, df in samples.items():
-        df.to_csv(f"{output_dir}/{name}.csv", index=False)
-    
-    print(f"Created {len(samples)} sample datasets in {output_dir}/")
-    return samples
-
 def main():
     """
     Main function to download and prepare THETIS data
@@ -210,13 +142,11 @@ def main():
         if not data_samples:
             print("No motion data found in extracted files.")
             print("Creating sample data for testing...")
-            data_samples = create_sample_thetis_data()
         
     except Exception as e:
         print(f"Error downloading THETIS data: {e}")
         print("Creating sample data for testing...")
-        data_samples = create_sample_thetis_data()
-    
+
     print(f"\nDataset ready with {len(data_samples)} samples!")
     return data_samples
 
