@@ -3,91 +3,417 @@ import numpy as np
 import pandas as pd
 import torch
 
+def extract_tennis_biomechanical_features(data):
+    """
+    Extract comprehensive biomechanical features from tennis motion data.
+    Assumes data contains 3D joint coordinates over time.
+    """
+    data = ensure_numpy(data)
+    features = {}
+    
+    # Core tennis-specific features
+    features['joint_angles'] = extract_joint_angles(data)
+    features['limb_velocities'] = extract_limb_velocities(data)
+    features['kinetic_chain'] = extract_kinetic_chain_patterns(data)
+    features['racket_dynamics'] = extract_racket_dynamics(data)
+    features['body_rotation'] = extract_body_rotation_features(data)
+    features['timing_features'] = extract_temporal_features(data)
+    features['power_generation'] = extract_power_generation_features(data)
+    
+    return features
+
+def get_joint_mapping(data):
+    """
+    Map generic joint names to actual column names in the dataset.
+    """
+    available_columns = data.columns.tolist() if hasattr(data, 'columns') else []
+    
+    # Common joint name variations in motion capture datasets
+    joint_variations = {
+        'shoulder': ['shoulder', 'right_shoulder', 'RShoulder', 'R_Shoulder', 'shoulder_r'],
+        'elbow': ['elbow', 'right_elbow', 'RElbow', 'R_Elbow', 'elbow_r'],
+        'wrist': ['wrist', 'right_wrist', 'RWrist', 'R_Wrist', 'wrist_r', 'hand', 'right_hand'],
+        'spine': ['spine', 'torso', 'chest', 'trunk', 'SpineBase', 'spine_base'],
+        'hip': ['hip', 'right_hip', 'RHip', 'R_Hip', 'hip_r', 'pelvis'],
+        'knee': ['knee', 'right_knee', 'RKnee', 'R_Knee', 'knee_r'],
+        'ankle': ['ankle', 'right_ankle', 'RAnkle', 'R_Ankle', 'ankle_r', 'foot', 'right_foot'],
+        'racket_tip': ['racket_tip', 'racket', 'racquet_tip', 'racquet', 'tool_tip']
+    }
+    
+    mapping = {}
+    for generic_name, variations in joint_variations.items():
+        for variation in variations:
+            if variation in available_columns:
+                mapping[generic_name] = variation
+                break
+        
+        # If no exact match found, try case-insensitive matching
+        if generic_name not in mapping:
+            for col in available_columns:
+                if any(var.lower() in col.lower() for var in variations):
+                    mapping[generic_name] = col
+                    break
+    
+    return mapping
+
+def preprocess_motion_data(data):
+    """
+    Preprocess raw motion capture data to handle missing values and normalize coordinates.
+    """
+    if isinstance(data, np.ndarray):
+        # Convert to DataFrame if numpy array (assuming structured format)
+        if data.ndim == 3:  # (frames, joints, coordinates)
+            joint_names = ['head', 'neck', 'spine', 'left_shoulder', 'right_shoulder', 
+                          'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist',
+                          'left_hip', 'right_hip', 'left_knee', 'right_knee',
+                          'left_ankle', 'right_ankle', 'racket_tip']
+            
+            frames, n_joints, coords = data.shape
+            df_data = {}
+            
+            for i, joint in enumerate(joint_names[:min(n_joints, len(joint_names))]):
+                df_data[joint] = [data[frame, i, :] for frame in range(frames)]
+            
+            data = pd.DataFrame(df_data)
+    
+    # Fill missing values with interpolation
+    if hasattr(data, 'columns'):
+        for col in data.columns:
+            if data[col].isnull().any():
+                data[col] = data[col].interpolate(method='linear')
+    
+    return data
+
 def extract_joint_angles(data):
-    data = ensure_numpy(data)  # Ensure compatibility with PyTorch tensors
+    """
+    Calculate tennis-specific joint angles (shoulder, elbow, wrist, hip, knee).
+    """
+    data = ensure_numpy(data)
     angles = {}
-    for joint in data.columns:
-        if 'joint' in joint:
-            # Calculate angles based on joint positions
-            angles[joint] = calculate_joint_angle(data[joint])
+    
+    # Map generic joint names to likely column names in THETIS dataset
+    joint_mapping = get_joint_mapping(data)
+    
+    # Define tennis-relevant joint angle calculations using mapped names
+    tennis_joints = {
+        'shoulder_flexion': [joint_mapping.get('shoulder'), joint_mapping.get('elbow'), joint_mapping.get('wrist')],
+        'elbow_flexion': [joint_mapping.get('shoulder'), joint_mapping.get('elbow'), joint_mapping.get('wrist')],
+        'wrist_extension': [joint_mapping.get('elbow'), joint_mapping.get('wrist'), joint_mapping.get('racket_tip')],
+        'hip_rotation': [joint_mapping.get('spine'), joint_mapping.get('hip'), joint_mapping.get('knee')],
+        'knee_flexion': [joint_mapping.get('hip'), joint_mapping.get('knee'), joint_mapping.get('ankle')]
+    }
+    
+    for angle_name, joint_sequence in tennis_joints.items():
+        # Check if all required joints are available and not None
+        if all(joint is not None and joint in data.columns for joint in joint_sequence):
+            angles[angle_name] = calculate_tennis_joint_angle(data, joint_sequence)
+        else:
+            print(f"Warning: Missing joints for {angle_name}. Available columns: {list(data.columns)[:10]}...")
+            angles[angle_name] = np.zeros(len(data)) if hasattr(data, '__len__') else np.array([0])
+    
     return angles
 
-def calculate_joint_angle(joint_data):
+def calculate_tennis_joint_angle(data, joint_sequence):
     """
-    Calculate angles between joints using their 2D positions.
+    Calculate angle between three joints forming a kinematic chain.
     """
     angles = []
-    for i in range(len(joint_data) - 1):
-        # Compute vectors between consecutive joints
-        vector1 = joint_data[i]
-        vector2 = joint_data[i + 1]
-        # Calculate angle using dot product and magnitude
-        dot_product = np.dot(vector1, vector2)
-        magnitude1 = np.linalg.norm(vector1)
-        magnitude2 = np.linalg.norm(vector2)
-        angle = np.arccos(dot_product / (magnitude1 * magnitude2))
-        angles.append(np.degrees(angle))
-    return angles
+    joint1, joint2, joint3 = joint_sequence
+    
+    for i in range(len(data)):
+        try:
+            # Get 3D positions - handle different data formats
+            p1 = get_3d_position(data[joint1].iloc[i])
+            p2 = get_3d_position(data[joint2].iloc[i])
+            p3 = get_3d_position(data[joint3].iloc[i])
+            
+            # Calculate vectors
+            v1 = p1 - p2
+            v2 = p3 - p2
+            
+            # Avoid division by zero
+            norm1, norm2 = np.linalg.norm(v1), np.linalg.norm(v2)
+            if norm1 == 0 or norm2 == 0:
+                angles.append(0)
+                continue
+            
+            # Calculate angle
+            cos_angle = np.dot(v1, v2) / (norm1 * norm2)
+            cos_angle = np.clip(cos_angle, -1.0, 1.0)  # Prevent numerical errors
+            angle = np.arccos(cos_angle)
+            angles.append(np.degrees(angle))
+        except (ValueError, IndexError, TypeError):
+            angles.append(0)  # Default value for missing data
+    
+    return np.array(angles)
+
+def get_3d_position(position_data):
+    """
+    Extract 3D position from various data formats.
+    """
+    if isinstance(position_data, (list, np.ndarray)):
+        pos = np.array(position_data)
+        if len(pos) >= 3:
+            return pos[:3]
+        elif len(pos) == 2:
+            return np.array([pos[0], pos[1], 0])
+        else:
+            return np.array([pos[0], 0, 0])
+    else:
+        # Single value - assume x coordinate
+        return np.array([float(position_data), 0, 0])
+
+def extract_racket_dynamics(data):
+    """
+    Extract racket-specific biomechanical features for tennis analysis.
+    """
+    data = ensure_numpy(data)
+    racket_features = {}
+    
+    # Racket velocity and acceleration
+    if 'racket_tip' in data.columns:
+        racket_positions = np.array([pos if isinstance(pos, (list, np.ndarray)) else [pos, 0, 0] 
+                                   for pos in data['racket_tip']])
+        
+        # Calculate velocities
+        racket_features['velocity'] = np.gradient(racket_positions, axis=0)
+        racket_features['speed'] = np.linalg.norm(racket_features['velocity'], axis=1)
+        
+        # Calculate acceleration
+        racket_features['acceleration'] = np.gradient(racket_features['velocity'], axis=0)
+        racket_features['acceleration_magnitude'] = np.linalg.norm(racket_features['acceleration'], axis=1)
+        
+        # Impact phase detection (highest acceleration)
+        racket_features['impact_frame'] = np.argmax(racket_features['acceleration_magnitude'])
+        racket_features['max_velocity'] = np.max(racket_features['speed'])
+    
+    return racket_features
+
+def extract_body_rotation_features(data):
+    """
+    Extract body rotation and trunk dynamics for tennis strokes.
+    """
+    data = ensure_numpy(data)
+    rotation_features = {}
+    
+    required_joints = ['left_shoulder', 'right_shoulder', 'spine']
+    joint_mapping = get_joint_mapping(data)
+    
+    # Map to actual column names
+    mapped_joints = {
+        'left_shoulder': joint_mapping.get('shoulder', 'left_shoulder'),
+        'right_shoulder': joint_mapping.get('shoulder', 'right_shoulder'), 
+        'spine': joint_mapping.get('spine', 'spine')
+    }
+    
+    if all(joint in data.columns for joint in mapped_joints.values()):
+        # Calculate shoulder rotation relative to spine
+        trunk_rotations = []
+        
+        for i in range(len(data)):
+            try:
+                left_shoulder = get_3d_position(data[mapped_joints['left_shoulder']].iloc[i])
+                right_shoulder = get_3d_position(data[mapped_joints['right_shoulder']].iloc[i])
+                spine = get_3d_position(data[mapped_joints['spine']].iloc[i])
+                
+                # Calculate shoulder line vector
+                shoulder_vector = right_shoulder - left_shoulder
+                
+                # Calculate rotation angle (simplified 2D projection)
+                rotation_angle = np.arctan2(shoulder_vector[1], shoulder_vector[0])
+                trunk_rotations.append(np.degrees(rotation_angle))
+            except (ValueError, IndexError, TypeError):
+                trunk_rotations.append(0)
+        
+        rotation_features['trunk_rotation'] = np.array(trunk_rotations)
+        rotation_features['trunk_angular_velocity'] = np.gradient(rotation_features['trunk_rotation'])
+    else:
+        print(f"Warning: Missing required joints for body rotation. Need: {required_joints}")
+        rotation_features['trunk_rotation'] = np.zeros(len(data))
+        rotation_features['trunk_angular_velocity'] = np.zeros(len(data))
+    
+    return rotation_features
+
+def extract_temporal_features(data):
+    """
+    Extract timing-related features for tennis stroke analysis.
+    """
+    temporal_features = {}
+    
+    # Stroke duration
+    temporal_features['stroke_duration'] = len(data)
+    
+    # Phase identification (assuming data represents one complete stroke)
+    total_frames = len(data)
+    temporal_features['preparation_phase'] = slice(0, total_frames // 3)
+    temporal_features['execution_phase'] = slice(total_frames // 3, 2 * total_frames // 3)
+    temporal_features['follow_through_phase'] = slice(2 * total_frames // 3, total_frames)
+    
+    return temporal_features
+
+def extract_power_generation_features(data):
+    """
+    Extract features related to power generation in tennis strokes.
+    """
+    data = ensure_numpy(data)
+    power_features = {}
+    
+    # Calculate kinetic energy approximation
+    if 'racket_tip' in data.columns:
+        racket_positions = np.array([pos if isinstance(pos, (list, np.ndarray)) else [pos, 0, 0] 
+                                   for pos in data['racket_tip']])
+        velocities = np.gradient(racket_positions, axis=0)
+        speeds = np.linalg.norm(velocities, axis=1)
+        
+        # Assuming unit mass for relative comparison
+        power_features['kinetic_energy'] = 0.5 * speeds**2
+        power_features['peak_power'] = np.max(power_features['kinetic_energy'])
+        power_features['average_power'] = np.mean(power_features['kinetic_energy'])
+    
+    return power_features
 
 def extract_limb_velocities(data):
-    data = ensure_numpy(data)  # Ensure compatibility with PyTorch tensors
+    """
+    Calculate velocities of key body segments for tennis analysis.
+    """
+    data = ensure_numpy(data)
     velocities = {}
-    for limb in data.columns:
-        if 'limb' in limb:
-            # Calculate velocities based on limb positions
-            velocities[limb] = calculate_limb_velocity(data[limb])
-    return velocities
-
-def calculate_limb_velocity(limb_data):
-    """
-    Calculate velocities of limbs based on their positions over time.
-    """
-    velocities = np.gradient(limb_data, axis=0)  # Compute gradient along time axis
+    joint_mapping = get_joint_mapping(data)
+    
+    # Tennis-specific limb segments with mapping
+    tennis_segments = {
+        'hand': joint_mapping.get('wrist', 'hand'),
+        'forearm': joint_mapping.get('elbow', 'forearm'),
+        'upper_arm': joint_mapping.get('shoulder', 'upper_arm'),
+        'racket_tip': joint_mapping.get('racket_tip', 'racket_tip'),
+        'foot': joint_mapping.get('ankle', 'foot'),
+        'shin': joint_mapping.get('knee', 'shin'),
+        'thigh': joint_mapping.get('hip', 'thigh')
+    }
+    
+    for segment_name, column_name in tennis_segments.items():
+        if column_name and column_name in data.columns:
+            try:
+                segment_data = np.array([get_3d_position(pos) for pos in data[column_name]])
+                velocities[segment_name] = np.gradient(segment_data, axis=0)
+            except Exception as e:
+                print(f"Warning: Could not calculate velocity for {segment_name}: {e}")
+                velocities[segment_name] = np.zeros((len(data), 3))
+        else:
+            print(f"Warning: Column {column_name} not found for segment {segment_name}")
+            velocities[segment_name] = np.zeros((len(data), 3))
+    
     return velocities
 
 def extract_kinetic_chain_patterns(data):
     """
-    Extract kinetic chain patterns by analyzing sequential activation of joints and limbs.
+    Analyze kinetic chain patterns specific to tennis biomechanics.
     """
-    data = ensure_numpy(data)  # Ensure compatibility with PyTorch tensors
+    data = ensure_numpy(data)
     patterns = {}
-    for joint in data.columns:
-        if 'joint' in joint:
-            # Analyze sequential activation (placeholder logic)
-            patterns[joint] = analyze_kinetic_chain(data[joint])
+    
+    # Tennis kinetic chain: legs → trunk → shoulder → elbow → wrist → racket
+    kinetic_chain = ['ankle', 'knee', 'hip', 'spine', 'shoulder', 'elbow', 'wrist', 'racket_tip']
+    
+    for i, joint in enumerate(kinetic_chain):
+        if joint in data.columns:
+            patterns[f'{joint}_activation'] = analyze_segment_activation(data[joint])
+            
+            # Calculate timing relative to racket impact
+            if 'racket_tip' in data.columns:
+                patterns[f'{joint}_timing'] = calculate_activation_timing(data[joint], data['racket_tip'])
+    
     return patterns
 
-def analyze_kinetic_chain(joint_data):
+def analyze_segment_activation(segment_data):
     """
-    Analyze sequential activation of joints and limbs.
+    Analyze when a body segment becomes active in the movement.
     """
-    activation_patterns = []
-    for i in range(len(joint_data) - 1):
-        # Compute movement magnitude between consecutive frames
-        movement_magnitude = np.linalg.norm(joint_data[i + 1] - joint_data[i])
-        activation_patterns.append(movement_magnitude)
-    return activation_patterns
+    segment_positions = np.array([pos if isinstance(pos, (list, np.ndarray)) else [pos, 0, 0] 
+                                for pos in segment_data])
+    
+    # Calculate movement magnitude
+    velocities = np.gradient(segment_positions, axis=0)
+    speeds = np.linalg.norm(velocities, axis=1)
+    
+    # Find activation threshold (when speed exceeds 10% of max speed)
+    activation_threshold = 0.1 * np.max(speeds)
+    activation_frames = speeds > activation_threshold
+    
+    return activation_frames
+
+def calculate_activation_timing(segment_data, racket_data):
+    """
+    Calculate timing of segment activation relative to racket impact.
+    """
+    # Find racket impact frame (peak acceleration)
+    racket_positions = np.array([pos if isinstance(pos, (list, np.ndarray)) else [pos, 0, 0] 
+                               for pos in racket_data])
+    racket_velocities = np.gradient(racket_positions, axis=0)
+    racket_accelerations = np.gradient(racket_velocities, axis=0)
+    impact_frame = np.argmax(np.linalg.norm(racket_accelerations, axis=1))
+    
+    # Find segment activation
+    segment_activation = analyze_segment_activation(segment_data)
+    if np.any(segment_activation):
+        first_activation = np.argmax(segment_activation)
+        timing_relative_to_impact = first_activation - impact_frame
+    else:
+        timing_relative_to_impact = 0
+    
+    return timing_relative_to_impact
 
 def perform_causal_analysis(features):
     """
-    Identify causal relationships relevant to stroke performance or injury risk.
+    Identify causal relationships relevant to tennis stroke performance.
     """
     causal_relationships = {}
-    for feature in features:
-        causal_relationships[feature] = analyze_causality(features[feature])
+    
+    # Analyze relationships between kinetic chain timing and racket speed
+    if 'racket_dynamics' in features and 'kinetic_chain' in features:
+        causal_relationships['timing_to_power'] = analyze_timing_power_relationship(
+            features['kinetic_chain'], features['racket_dynamics']
+        )
+    
+    # Analyze joint angle relationships to stroke effectiveness
+    if 'joint_angles' in features:
+        causal_relationships['angle_correlations'] = analyze_angle_correlations(features['joint_angles'])
+    
     return causal_relationships
 
-def analyze_causality(feature_data):
+def analyze_timing_power_relationship(kinetic_chain, racket_dynamics):
     """
-    Perform statistical analysis to identify causal relationships.
+    Analyze relationship between kinetic chain timing and power generation.
     """
-    # Example: Compute correlation coefficients
+    relationships = {}
+    
+    if 'max_velocity' in racket_dynamics:
+        max_velocity = racket_dynamics['max_velocity']
+        
+        for segment, timing in kinetic_chain.items():
+            if 'timing' in segment:
+                # Calculate correlation between timing and power
+                correlation = np.corrcoef([timing], [max_velocity])[0, 1] if not np.isnan([timing, max_velocity]).any() else 0
+                relationships[segment] = correlation
+    
+    return relationships
+
+def analyze_angle_correlations(joint_angles):
+    """
+    Analyze correlations between joint angles for biomechanical insights.
+    """
     correlations = {}
-    for feature1 in feature_data.columns:
-        for feature2 in feature_data.columns:
-            if feature1 != feature2:
-                correlation = np.corrcoef(feature_data[feature1], feature_data[feature2])[0, 1]
-                correlations[(feature1, feature2)] = correlation
+    angle_names = list(joint_angles.keys())
+    
+    for i, angle1 in enumerate(angle_names):
+        for angle2 in angle_names[i+1:]:
+            try:
+                correlation = np.corrcoef(joint_angles[angle1], joint_angles[angle2])[0, 1]
+                if not np.isnan(correlation):
+                    correlations[f'{angle1}_vs_{angle2}'] = correlation
+            except (ValueError, IndexError):
+                correlations[f'{angle1}_vs_{angle2}'] = 0
+    
     return correlations
 
 def ensure_numpy(data):
@@ -97,4 +423,106 @@ def ensure_numpy(data):
     """
     if isinstance(data, torch.Tensor):
         return data.detach().cpu().numpy()
-    return data
+    elif isinstance(data, pd.DataFrame):
+        return data
+    elif isinstance(data, np.ndarray):
+        # Convert numpy array to DataFrame if it's 3D (frames, joints, coordinates)
+        if data.ndim == 3:
+            return preprocess_motion_data(data)
+        return data
+    else:
+        # Try to convert to numpy array first, then to DataFrame if needed
+        try:
+            arr = np.array(data)
+            if arr.ndim == 3:
+                return preprocess_motion_data(arr)
+            return arr
+        except:
+            raise ValueError(f"Cannot convert data of type {type(data)} to usable format")
+
+
+
+def validate_features(features):
+    """
+    Validate extracted features and provide quality metrics.
+    """
+    validation_report = {
+        'completeness': {},
+        'quality_metrics': {},
+        'warnings': []
+    }
+    
+    # Check completeness
+    expected_features = ['joint_angles', 'limb_velocities', 'kinetic_chain', 
+                        'racket_dynamics', 'body_rotation', 'timing_features', 
+                        'power_generation']
+    
+    for feature_type in expected_features:
+        if feature_type in features and features[feature_type]:
+            validation_report['completeness'][feature_type] = True
+        else:
+            validation_report['completeness'][feature_type] = False
+            validation_report['warnings'].append(f"Missing or empty: {feature_type}")
+    
+    # Quality metrics
+    if 'racket_dynamics' in features and 'max_velocity' in features['racket_dynamics']:
+        max_vel = features['racket_dynamics']['max_velocity']
+        if max_vel > 200:  # Unrealistic racket speed (m/s)
+            validation_report['warnings'].append(f"Unrealistic racket velocity: {max_vel}")
+    
+    return validation_report
+
+def extract_features_with_validation(data):
+    """
+    Extract features with validation and error handling.
+    """
+    try:
+        # Preprocess data first
+        processed_data = preprocess_motion_data(data)
+        
+        # Extract features
+        features = extract_tennis_biomechanical_features(processed_data)
+        
+        # Validate results
+        validation = validate_features(features)
+        
+        return {
+            'features': features,
+            'validation': validation,
+            'success': True,
+            'data_shape': processed_data.shape if hasattr(processed_data, 'shape') else len(processed_data),
+            'available_columns': list(processed_data.columns) if hasattr(processed_data, 'columns') else []
+        }
+    except Exception as e:
+        return {
+            'features': {},
+            'validation': {'error': str(e)},
+            'success': False,
+            'data_shape': None,
+            'available_columns': []
+        }
+
+def get_feature_summary(features):
+    """
+    Get a summary of extracted features for analysis.
+    """
+    summary = {}
+    
+    for feature_type, feature_data in features.items():
+        if isinstance(feature_data, dict):
+            summary[feature_type] = {}
+            for key, value in feature_data.items():
+                if isinstance(value, np.ndarray):
+                    summary[feature_type][key] = {
+                        'shape': value.shape,
+                        'mean': float(np.mean(value)) if value.size > 0 else 0,
+                        'std': float(np.std(value)) if value.size > 0 else 0,
+                        'min': float(np.min(value)) if value.size > 0 else 0,
+                        'max': float(np.max(value)) if value.size > 0 else 0
+                    }
+                else:
+                    summary[feature_type][key] = value
+        else:
+            summary[feature_type] = str(type(feature_data))
+    
+    return summary
