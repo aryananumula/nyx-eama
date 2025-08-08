@@ -21,7 +21,7 @@ def generate_feedback(stroke_data):
 
     return feedback
 
-
+# hi
 def format_input_for_llm(stroke_data):
     """
     Format the stroke data into a string suitable for LLM input.
