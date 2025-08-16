@@ -4,6 +4,9 @@ Feature Extraction Integration Test
 Integration testing of biomechanical feature extraction with real THETIS tennis data
 """
 
+from feature_extraction_visualization import visualize_tennis_biomechanics, create_stroke_animation
+
+
 import numpy as np
 import pandas as pd
 import os
@@ -89,11 +92,26 @@ def detailed_thetis_analysis():
             
             # Kinetic chain
             if features['kinetic_chain']:
+                # chain = features['kinetic_chain']
+                # print(f"    ⛓️  Kinetic Chain:")
+                # print(f"       - Efficiency: {chain.get('chain_efficiency', 0):.3f}")
+                # print(f"       - Coordination: {chain.get('coordination_score', 0):.3f}")
                 chain = features['kinetic_chain']
                 print(f"    ⛓️  Kinetic Chain:")
+                print(f"       - Keys available: {list(chain.keys())}")  # ADD THIS LINE
                 print(f"       - Efficiency: {chain.get('chain_efficiency', 0):.3f}")
                 print(f"       - Coordination: {chain.get('coordination_score', 0):.3f}")
+                print(f"       - Activation times: {chain.get('activation_times', 'MISSING')}")  # ADD THIS LINE
             
+            # Body rotation
+            if features['body_rotation']:
+                rotation = features['body_rotation']
+                print(f"    🔄 Body Rotation:")
+                print(f"       - Keys available: {list(rotation.keys())}")
+                print(f"       - Data: {rotation}")
+                print(f"       - Rotation range: {rotation.get('rotation_range', 0):.2f} degrees")
+                print(f"       - Peak angular velocity: {rotation.get('peak_angular_velocity', 0):.2f} rad/s")
+
             # Timing features
             if features['timing_features']:
                 timing = features['timing_features']
@@ -106,6 +124,13 @@ def detailed_thetis_analysis():
         except Exception as e:
             print(f"    ❌ ERROR: {e}")
             return False
+        
+        if features:
+            # Generate visualization
+            output_path = f"tennis_analysis_{i+1}.png"
+            fig = visualize_tennis_biomechanics(data, features, output_path)
+            print(f"    📊 Visualization saved: {output_path}")
+
     
     return True
 
