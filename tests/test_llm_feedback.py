@@ -1,4 +1,4 @@
-test_llm_feedback.py
+#test_llm_feedback.py
 import sys
 import os
 import numpy as np
@@ -6,7 +6,7 @@ import numpy as np
 # Add src to path so imports work
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
-from feedback.llm_feedback import generate_feedback
+from feedback.llm_feedback import build_context_summary, generate_feedback
 
 # Mock features from feature_extraction output
 MOCK_FEATURES = {
@@ -44,6 +44,12 @@ MOCK_FEATURES = {
     },
 }
 
+def test_context_summary_generation_with_mock_features():
+    print(">>> Formatted context summary:")
+    summary = build_context_summary(MOCK_FEATURES)
+    print(summary)
+    print("====================")                      
+    
 def test_generate_feedback_with_mock_features():
     print(">>> Sending mocked features to LLM...")
     response = generate_feedback(MOCK_FEATURES)

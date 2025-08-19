@@ -11,3 +11,4 @@ env/
 .DS_Store
 .DS_Store?
 *.csv
+.env

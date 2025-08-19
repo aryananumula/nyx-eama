@@ -2,13 +2,12 @@ import os
 from pathlib import Path
 from typing import Dict, Tuple, List, Any
 from dotenv import load_dotenv
-from openai import OpenAI
+import google.generativeai as genai
 
 # Loads .env
-load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
-API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-4o")
+API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Reference ranges for tennis strokes
 # Keys expected from your features dict:
@@ -114,11 +113,13 @@ REFERENCE_RANGES: Dict[str, Dict[str, Tuple[float, float]]] = {
     },
 }
 
+
 def _fmt_num(x: Any) -> str:
     try:
         return f"{float(x):.2f}"
     except Exception:
         return str(x)
+
 
 def compare_to_reference(features: Dict[str, Any], stroke_type: str) -> List[str]:
     """
@@ -155,14 +156,19 @@ def compare_to_reference(features: Dict[str, Any], stroke_type: str) -> List[str
 
         if v < lo:
             diff = (lo - v) / (hi - lo + 1e-9) * 100.0
-            findings.append(f"{labels[key]} LOW: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% below range).")
+            findings.append(
+                f"{labels[key]} LOW: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% below range)."
+            )
         elif v > hi:
             diff = (v - hi) / (hi - lo + 1e-9) * 100.0
-            findings.append(f"{labels[key]} HIGH: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% above range).")
+            findings.append(
+                f"{labels[key]} HIGH: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% above range)."
+            )
         else:
             findings.append(f"{labels[key]} OK: {_fmt_num(v)} within {lo}-{hi}.")
 
     return findings
+
 
 def build_context_summary(features: Dict[str, Any]) -> str:
     stroke = (
@@ -186,11 +192,14 @@ def build_context_summary(features: Dict[str, Any]) -> str:
     ]
     return "\n".join(lines)
 
+
 if not API_KEY:
+
     def generate_feedback(_features):
-        return "[ERROR] OPENAI_API_KEY not set. Add it to .env or your environment."
+        return "[ERROR] GEMINI_API_KEY not set. Add it to .env or your environment."
+
 else:
-    client = OpenAI(api_key=API_KEY)
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
     def generate_feedback(features: Dict[str, Any]) -> str:
         """
@@ -209,15 +218,14 @@ else:
         )
 
         try:
-            resp = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": "You are a precise, evidence-based tennis coach."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
-                max_tokens=120,
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            resp = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=200,
+                ),
             )
-            return resp.choices[0].message.content.strip()
+            return resp.text.strip()
         except Exception as e:
             return f"[ERROR] Could not generate feedback: {e}"
