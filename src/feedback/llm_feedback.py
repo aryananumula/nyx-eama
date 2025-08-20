@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Tuple, List, Any
 from dotenv import load_dotenv
 import google.generativeai as genai
+import numpy as np
 
 # Loads .env
 load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
@@ -171,24 +172,46 @@ def compare_to_reference(features: Dict[str, Any], stroke_type: str) -> List[str
 
 
 def build_context_summary(features: Dict[str, Any]) -> str:
+        # format raw features to match reference keys
+    def peak_angular_velocity(joint_array):
+        angles = np.array(joint_array)
+        vel = np.diff(np.radians(angles))
+        return np.max(np.abs(vel))
+
+    condensed = {
+        "racket_velocity_mps": max(features["racket_dynamics"]["speed"]),
+        "peak_power_W": features["power_generation"]["peak_power"],
+        "rotation_range_deg": max(features["joint_angles"]["hip_rotation"])
+        - min(features["joint_angles"]["hip_rotation"]),
+        "stroke_duration_frames_60fps": features["timing_features"]["stroke_duration"],
+        "peak_angular_velocity_rad_s": max(
+            peak_angular_velocity(features["joint_angles"][joint])
+            for joint in features["joint_angles"]
+        ),
+        "impact_timing_pct": 100
+        * features["racket_dynamics"]["impact_frame"]
+        / features["timing_features"]["stroke_duration"],
+        "classification": features.get("classification", {}).get("type"),
+    }
+
     stroke = (
-        features.get("predicted_stroke")
-        or features.get("classification", {}).get("label")
+        condensed.get("predicted_stroke")
+        or condensed.get("classification")
         or "UNKNOWN"
     )
-    cmp_lines = compare_to_reference(features, stroke)
+    cmp_lines = compare_to_reference(condensed, stroke)
     lines = [
         f"Predicted stroke: {stroke}",
         "Optimal-range comparison:",
         *[" - " + line for line in cmp_lines],
         "",
         "Raw features (subset):",
-        f" - racket_velocity_mps: {features.get('racket_velocity_mps')}",
-        f" - peak_power_W: {features.get('peak_power_W')}",
-        f" - rotation_range_deg: {features.get('rotation_range_deg')}",
-        f" - stroke_duration_frames_60fps: {features.get('stroke_duration_frames_60fps')}",
-        f" - peak_angular_velocity_rad_s: {features.get('peak_angular_velocity_rad_s')}",
-        f" - impact_timing_pct: {features.get('impact_timing_pct')}",
+        f" - racket_velocity_mps: {condensed.get('racket_velocity_mps')}",
+        f" - peak_power_W: {condensed.get('peak_power_W')}",
+        f" - rotation_range_deg: {condensed.get('rotation_range_deg')}",
+        f" - stroke_duration_frames_60fps: {condensed.get('stroke_duration_frames_60fps')}",
+        f" - peak_angular_velocity_rad_s: {condensed.get('peak_angular_velocity_rad_s')}",
+        f" - impact_timing_pct: {condensed.get('impact_timing_pct')}",
     ]
     return "\n".join(lines)
 

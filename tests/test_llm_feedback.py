@@ -39,7 +39,7 @@ MOCK_FEATURES = {
         "average_power": 0.77,
     },
     "classification": {
-        "type": "volley",
+        "type": "Forehand Volley",
         "power_level": "low",
     },
 }
