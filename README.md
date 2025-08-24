@@ -47,8 +47,9 @@ This project aims to develop a pipeline for classifying tennis strokes using 3D 
    ```
    pip install -r pyproject.txt
    ```
+   
 
-3. Download the necessary datasets using the `thetis_download.py` script.
+3. Download the necessary datasets using the `thetis_download.py` script. Download the model file from [this google drive](https://drive.google.com/drive/folders/1g345rC3bImH04ZnDhoBwHOTYlUCbCC2c?usp=sharing) and place model.pt in the project directory.
 
 4. Run the pipeline using the `pipeline.py` script to classify tennis strokes and generate feedback.
 
