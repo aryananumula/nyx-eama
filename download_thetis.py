@@ -9,6 +9,17 @@ import requests
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
+import numpy as np
+import struct
+from pathlib import Path
+
+# Define the joint names in the order they appear in the sample CSVs
+JOINT_NAMES = [
+    'Head', 'Neck', 'SpineShoulder', 'ShoulderLeft', 'ShoulderRight',
+    'ElbowLeft', 'ElbowRight', 'WristLeft', 'WristRight', 'HandLeft',
+    'HandRight', 'SpineBase', 'HipLeft', 'HipRight', 'KneeLeft',
+    'KneeRight', 'AnkleLeft', 'AnkleRight', 'FootLeft', 'FootRight'
+]
 
 def download_thetis_data():
     """
@@ -88,42 +99,122 @@ def extract_thetis_files(zip_files):
         except Exception as e:
             print(f"Error extracting {zip_path}: {e}")
 
-def load_thetis_motion_data():
+def read_c3d_points(c3d_path):
     """
-    Load and process THETIS motion capture data
+    Read 3D point data from a C3D file using the c3d library
     """
-    extract_dir = "thetis_output/extracted"
-    
-    if not os.path.exists(extract_dir):
-        print("No extracted THETIS data found. Please download first.")
-        return {}
-    
-    data_samples = {}
-    
-    # Look for motion capture files
-    for root, dirs, files in os.walk(extract_dir):
-        for file in files:
-            if file.endswith(('.csv', '.txt', '.c3d')):
-                file_path = os.path.join(root, file)
-                sample_name = os.path.basename(root) + "_" + file.replace('.csv', '').replace('.txt', '').replace('.c3d', '')
+    try:
+        import c3d
+        import numpy as np
+        
+        # Read the C3D file
+        with open(c3d_path, 'rb') as handle:
+            reader = c3d.Reader(handle)
+            
+            # Get data dimensions from header
+            point_labels = [str(label, 'utf-8').strip() for label in reader.point_labels]
+            first_frame = reader.header.first_frame
+            last_frame = reader.header.last_frame
+            n_frames = last_frame - first_frame + 1
+            
+            # Reset reader to start
+            handle.seek(0)
+            reader = c3d.Reader(handle)
+            
+            # Process each frame separately
+            all_points = []
+            first_frame_points = None
+            
+            for frame_no, points, analog in reader.read_frames():
+                frame_points = []
                 
-                try:
-                    # Try to load as CSV first
-                    if file.endswith('.csv'):
-                        df = pd.read_csv(file_path)
-                        data_samples[sample_name] = df
-                        print(f"Loaded {sample_name}: {df.shape}")
-                    
-                    elif file.endswith('.txt'):
-                        # Try loading as space/tab separated
-                        df = pd.read_csv(file_path, sep='\s+', header=None)
-                        data_samples[sample_name] = df
-                        print(f"Loaded {sample_name}: {df.shape}")
-                        
-                except Exception as e:
-                    print(f"Error loading {file_path}: {e}")
+                # points is a numpy array of shape (n_points, 3)
+                for point in points:
+                    x, y, z = point
+                    # Convert numpy float to Python float and handle NaN/inf
+                    x = float(x) if not (np.isnan(x) or np.isinf(x)) else 0.0
+                    y = float(y) if not (np.isnan(y) or np.isinf(y)) else 0.0
+                    z = float(z) if not (np.isnan(z) or np.isinf(z)) else 0.0
+                    frame_points.extend([x, y, z])
+                
+                # Store first frame points to validate structure
+                if first_frame_points is None:
+                    first_frame_points = frame_points
+                    n_points = len(first_frame_points) // 3
+                
+                # Ensure consistent point count across frames
+                if len(frame_points) != len(first_frame_points):
+                    print(f"Warning: Frame {frame_no} has inconsistent point count")
+                    # Pad with zeros if needed
+                    while len(frame_points) < len(first_frame_points):
+                        frame_points.extend([0.0, 0.0, 0.0])
+                    # Truncate if too long
+                    frame_points = frame_points[:len(first_frame_points)]
+                
+                all_points.append(frame_points)
+            
+            if not all_points:
+                print(f"No frames found in {c3d_path}")
+                return None
+            
+            # Create column names using point labels if available
+            n_points = len(first_frame_points) // 3
+            columns = []
+            for i in range(n_points):
+                point_name = point_labels[i] if i < len(point_labels) else f'Point{i+1}'
+                for coord in ['X', 'Y', 'Z']:
+                    columns.append(f'{point_name}_{coord}')
+            
+            # Create DataFrame
+            df = pd.DataFrame(all_points, columns=columns)
+            
+            # Add frame numbers as index
+            df.index = range(first_frame, first_frame + len(df))
+            df.index.name = 'Frame'
+            
+            return df
+            
+    except Exception as e:
+        print(f"Error reading {c3d_path}: {e}")
+        return None
+
+def process_c3d_files():
+    """
+    Process all C3D files and convert them to CSV format
+    """
+    output_dir = "thetis_output"  # Main output directory
+    os.makedirs(output_dir, exist_ok=True)
     
-    return data_samples
+    print("Converting C3D files to CSV format...")
+    
+    # Walk through extracted directory
+    for root, dirs, files in os.walk(os.path.join(output_dir, "extracted")):
+        for file in tqdm(files, desc="Processing C3D files"):
+            if file.endswith('.c3d'):
+                # Parse filename parts
+                parts = file.replace('.c3d', '').split('_')
+                if len(parts) >= 3:  # tp1_bh_s1
+                    player = parts[0]
+                    stroke = parts[1]
+                    
+                    # Create CSV filename (without sequence number)
+                    csv_name = f"{player}_{stroke}.csv"
+                    csv_path = os.path.join(output_dir, csv_name)
+                    
+                    # Convert C3D to DataFrame
+                    c3d_path = os.path.join(root, file)
+                    df = read_c3d_points(c3d_path)
+                    
+                    if df is not None:
+                        # If file exists, append; otherwise create new
+                        if os.path.exists(csv_path):
+                            df.to_csv(csv_path, mode='a', header=False, index=False)
+                        else:
+                            df.to_csv(csv_path, index=False)
+                        print(f"Processed {file} -> {csv_name}")
+    
+    print("\nAll C3D files have been processed.")
+    print("CSV files are available in thetis_output/")
 
 def main():
     """
@@ -132,23 +223,19 @@ def main():
     print("THETIS Dataset Downloader")
     print("=" * 40)
     
-    # Try to download real THETIS data
     try:
+        # Download and extract files
         downloaded_files = download_thetis_data()
         
-        # Load the extracted data
-        data_samples = load_thetis_motion_data()
+        # Process C3D files into CSV format
+        process_c3d_files()
         
-        if not data_samples:
-            print("No motion data found in extracted files.")
-            print("Creating sample data for testing...")
+        print("\nDataset processing complete!")
+        print("Full data CSV files are available in thetis_output/full_data/")
         
     except Exception as e:
-        print(f"Error downloading THETIS data: {e}")
-        print("Creating sample data for testing...")
-
-    print(f"\nDataset ready with {len(data_samples)} samples!")
-    return data_samples
+        print(f"Error processing THETIS data: {e}")
+        print("Please check the error and try again.")
 
 if __name__ == "__main__":
     main()
