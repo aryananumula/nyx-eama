@@ -1,0 +1,153 @@
+{
+  "n_records": 18,
+  "format_compliant_pct": 100.0,
+  "deterministic_pct": 100.0,
+  "precision_mean": 0.8888888888888888,
+  "recall_mean": 0.5555555555555556,
+  "per_record": [
+    {
+      "filename": "tp1_bh_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.5,
+      "n_gt_flags": 4
+    },
+    {
+      "filename": "tp1_bhb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.5,
+      "n_gt_flags": 4
+    },
+    {
+      "filename": "tp1_bhvb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.5,
+      "n_gt_flags": 4
+    },
+    {
+      "filename": "tp1_fh_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 0.5,
+      "recall": 0.3333333333333333,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp1_fhb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.5,
+      "n_gt_flags": 4
+    },
+    {
+      "filename": "tp1_fhvb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp2_bh_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 0.5,
+      "recall": 0.3333333333333333,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp2_bhb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 0.5,
+      "recall": 0.3333333333333333,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp2_bhvb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp2_fh_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.5,
+      "n_gt_flags": 4
+    },
+    {
+      "filename": "tp2_fhb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.5,
+      "n_gt_flags": 4
+    },
+    {
+      "filename": "tp2_fhvb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp3_bh_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 0.5,
+      "recall": 0.3333333333333333,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp3_bhb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 1.0,
+      "n_gt_flags": 2
+    },
+    {
+      "filename": "tp3_bhvb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp3_fh_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp3_fhb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    },
+    {
+      "filename": "tp3_fhvb_sample.csv",
+      "format_compliant": true,
+      "deterministic": true,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "n_gt_flags": 3
+    }
+  ]
+}

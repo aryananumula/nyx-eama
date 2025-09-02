@@ -1,0 +1,26 @@
+{
+  "racket_max_velocity": {
+    "test": "t-test",
+    "stat": NaN,
+    "pvalue": NaN,
+    "cohens_d": NaN
+  },
+  "rotation_range_deg": {
+    "test": "t-test",
+    "stat": NaN,
+    "pvalue": NaN,
+    "cohens_d": NaN
+  },
+  "peak_angular_velocity_rad_s": {
+    "test": "t-test",
+    "stat": NaN,
+    "pvalue": NaN,
+    "cohens_d": NaN
+  },
+  "stroke_duration_frames": {
+    "test": "t-test",
+    "stat": NaN,
+    "pvalue": NaN,
+    "cohens_d": NaN
+  }
+}
