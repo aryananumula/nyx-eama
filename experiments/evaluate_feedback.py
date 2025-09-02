@@ -5,9 +5,10 @@ from pathlib import Path
 import pandas as pd
 from tqdm import tqdm
 
-BASE_DIR = Path(__file__).resolve().parent
-EXTRACTED_DIR = BASE_DIR / "thetis_output" / "extracted"
-SRC_DIR = BASE_DIR / "src"
+EXPERIMENTS_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = EXPERIMENTS_DIR.parent
+EXTRACTED_DIR = PROJECT_ROOT / "thetis_output" / "extracted"
+SRC_DIR = PROJECT_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 from models.feature_extraction import extract_tennis_biomechanical_features
@@ -84,5 +85,5 @@ for folder in tqdm(sorted(EXTRACTED_DIR.iterdir()), desc="Backhand folders"):
             print(f"Error processing {c3d_path}: {e}")
 
 results_df = pd.DataFrame(results_list)
-results_df.to_csv(BASE_DIR / "stroke_evaluation_results.csv", index=False)
-print(f"Results saved to {BASE_DIR / 'stroke_evaluation_results.csv'}")
+output_path = EXPERIMENTS_DIR / "stroke_evaluation_results.csv"
+results_df.to_csv(output_path, index=False)
