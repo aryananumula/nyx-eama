@@ -76,11 +76,18 @@ def check_num_fidelity(feedback: str, features) -> bool:
             return False
     return True
 
+def check_error(feedback: str) -> bool:
+    feedback_lower = feedback.lower()
+    if "error" in feedback_lower:
+        return True
+    return False
+
 
 def run_tests(features, feedback):
     print("running tests...")
     structure = check_format(feedback)
     reference = check_reference(features, feedback)
     fidelity = check_num_fidelity(feedback, features)
-    print(structure, reference, fidelity)
-    return structure, reference, fidelity
+    errors = check_error(feedback)
+    print(structure, reference, fidelity, errors)
+    return structure, reference, fidelity, errors
