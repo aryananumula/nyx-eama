@@ -6,9 +6,14 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "av>=15.0.0",
+    "dotenv>=0.9.9",
     "ezc3d>=1.5.19",
+    "google-generativeai>=0.8.5",
+    "jupyter>=1.1.1",
+    "lab>=8.4",
     "matplotlib>=3.10.3",
     "numpy>=1.24.0",
+    "opencv-python>=4.11.0.86",
     "pandas>=2.3.1",
     "pytest>=8.4.1",
     "requests>=2.32.4",

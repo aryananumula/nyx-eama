@@ -2,13 +2,13 @@ import os
 from pathlib import Path
 from typing import Dict, Tuple, List, Any
 from dotenv import load_dotenv
-from openai import OpenAI
+import google.generativeai as genai
+import numpy as np
 
 # Loads .env
-load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 
-API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-4o")
+API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Reference ranges for tennis strokes
 # Keys expected from your features dict:
@@ -114,11 +114,13 @@ REFERENCE_RANGES: Dict[str, Dict[str, Tuple[float, float]]] = {
     },
 }
 
+
 def _fmt_num(x: Any) -> str:
     try:
         return f"{float(x):.2f}"
     except Exception:
         return str(x)
+
 
 def compare_to_reference(features: Dict[str, Any], stroke_type: str) -> List[str]:
     """
@@ -155,42 +157,106 @@ def compare_to_reference(features: Dict[str, Any], stroke_type: str) -> List[str
 
         if v < lo:
             diff = (lo - v) / (hi - lo + 1e-9) * 100.0
-            findings.append(f"{labels[key]} LOW: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% below range).")
+            findings.append(
+                f"{labels[key]} LOW: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% below range)."
+            )
         elif v > hi:
             diff = (v - hi) / (hi - lo + 1e-9) * 100.0
-            findings.append(f"{labels[key]} HIGH: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% above range).")
+            findings.append(
+                f"{labels[key]} HIGH: {_fmt_num(v)} vs optimal {lo}-{hi} (≈{diff:.0f}% above range)."
+            )
         else:
             findings.append(f"{labels[key]} OK: {_fmt_num(v)} within {lo}-{hi}.")
 
     return findings
 
+def safe_get(d, keys, default=None):
+    """
+    Safely retrieve a nested value from a dict.
+    If any key is missing or value is None/empty, return default.
+    """
+    for k in keys:
+        if not isinstance(d, dict) or k not in d:
+            return default
+        d = d[k]
+    # Handle numpy arrays / lists truth check
+    if d is None:
+        return default
+    if isinstance(d, (list, np.ndarray)) and len(d) == 0:
+        return default
+    return d
+
 def build_context_summary(features: Dict[str, Any]) -> str:
+     # format raw features to match reference keys
+    def peak_angular_velocity(joint_array):
+        angles = np.array(joint_array)
+        vel = np.diff(np.radians(angles))
+        return np.max(np.abs(vel))
+
+    # return None if feature can't be found
+    condensed = {
+        "racket_velocity_mps": (
+            max(safe_get(features, ["racket_dynamics", "speed"], []))
+            if safe_get(features, ["racket_dynamics", "speed"]) is not None
+            else None
+        ),
+        "peak_power_W": safe_get(features, ["power_generation", "peak_power"]),
+        "rotation_range_deg": (
+            (max(safe_get(features, ["joint_angles", "hip_rotation"], [])) -
+            min(safe_get(features, ["joint_angles", "hip_rotation"], [])))
+            if safe_get(features, ["joint_angles", "hip_rotation"]) is not None
+            else None
+        ),
+        "stroke_duration_frames_60fps": safe_get(features, ["timing_features", "stroke_duration"]),
+        "peak_angular_velocity_rad_s": (
+            max(
+                peak_angular_velocity(joint_vals)
+                for joint_vals in safe_get(features, ["joint_angles"], {}).values()
+                if joint_vals is not None
+            )
+            if safe_get(features, ["joint_angles"]) is not None
+            else None
+        ),
+        "impact_timing_pct": (
+            100 * safe_get(features, ["racket_dynamics", "impact_frame"]) /
+            safe_get(features, ["timing_features", "stroke_duration"])
+            if safe_get(features, ["racket_dynamics", "impact_frame"]) is not None
+            and safe_get(features, ["timing_features", "stroke_duration"]) not in (None, 0)
+            else None
+        ),
+        "classification": safe_get(features, ["classification", "type"]),
+    }
+
+
     stroke = (
-        features.get("predicted_stroke")
-        or features.get("classification", {}).get("label")
+        condensed.get("predicted_stroke")
+        or condensed.get("classification")
         or "UNKNOWN"
     )
-    cmp_lines = compare_to_reference(features, stroke)
+    cmp_lines = compare_to_reference(condensed, stroke)
     lines = [
         f"Predicted stroke: {stroke}",
         "Optimal-range comparison:",
         *[" - " + line for line in cmp_lines],
         "",
         "Raw features (subset):",
-        f" - racket_velocity_mps: {features.get('racket_velocity_mps')}",
-        f" - peak_power_W: {features.get('peak_power_W')}",
-        f" - rotation_range_deg: {features.get('rotation_range_deg')}",
-        f" - stroke_duration_frames_60fps: {features.get('stroke_duration_frames_60fps')}",
-        f" - peak_angular_velocity_rad_s: {features.get('peak_angular_velocity_rad_s')}",
-        f" - impact_timing_pct: {features.get('impact_timing_pct')}",
+        f" - racket_velocity_mps: {condensed.get('racket_velocity_mps')}",
+        f" - peak_power_W: {condensed.get('peak_power_W')}",
+        f" - rotation_range_deg: {condensed.get('rotation_range_deg')}",
+        f" - stroke_duration_frames_60fps: {condensed.get('stroke_duration_frames_60fps')}",
+        f" - peak_angular_velocity_rad_s: {condensed.get('peak_angular_velocity_rad_s')}",
+        f" - impact_timing_pct: {condensed.get('impact_timing_pct')}",
     ]
     return "\n".join(lines)
 
+
 if not API_KEY:
+
     def generate_feedback(_features):
-        return "[ERROR] OPENAI_API_KEY not set. Add it to .env or your environment."
+        return "[ERROR] GEMINI_API_KEY not set. Add it to .env or your environment."
+
 else:
-    client = OpenAI(api_key=API_KEY)
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
     def generate_feedback(features: Dict[str, Any]) -> str:
         """
@@ -202,22 +268,23 @@ else:
         prompt = (
             "You are a professional tennis biomechanics coach. "
             "First line: 'Overall Score: X/10' (0 = very poor, 10 = perfect). "
-            "Then provide a concise diagnosis (2–3 sentences) and exactly 3 actionable corrections. "
+            "Second, provide a list of metrics that are outside the optimal range, indicating whether each is LOW or HIGH and a descriptor of how much without stating specific numbers. "
+            "Third, provide a concise diagnosis (2–3 sentences) "
+            "Finally, provide exactly 3 actionable corrections phrased in concise, neutral, human-understandable coaching advice, focusing on how to improve performance rather than quoting exact numbers or ranges. "
             "Base your judgments on the optimal-range comparison; do not invent numbers."
             "\n\n"
             f"{context}"
         )
 
         try:
-            resp = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": "You are a precise, evidence-based tennis coach."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.2,
-                max_tokens=120,
+            model = genai.GenerativeModel("gemini-2.0-flash")
+            resp = model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=650,
+                ),
             )
-            return resp.choices[0].message.content.strip()
+            return resp.text.strip()
         except Exception as e:
             return f"[ERROR] Could not generate feedback: {e}"

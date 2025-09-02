@@ -108,7 +108,7 @@ def extract_joint_angles(data):
         if all(joint is not None and joint in data.columns for joint in joint_sequence):
             angles[angle_name] = calculate_tennis_joint_angle(data, joint_sequence)
         else:
-            print(f"Warning: Missing joints for {angle_name}. Available columns: {list(data.columns)[:10]}...")
+            # print(f"Warning: Missing joints for {angle_name}. Available columns: {list(data.columns)[:10]}...")
             angles[angle_name] = np.zeros(len(data)) if hasattr(data, '__len__') else np.array([0])
     
     return angles
@@ -218,13 +218,13 @@ def extract_body_rotation_features(data):
             features['rotation_range'] = np.degrees(np.max(trunk_rotation) - np.min(trunk_rotation))
             features['peak_angular_velocity'] = np.max(np.abs(trunk_angular_velocity))
             
-            print(f"Body rotation calculated: {len(trunk_rotation)} frames")
-            print(f"Rotation range: {features['rotation_range']:.2f} degrees")
-            print(f"Peak angular velocity: {features['peak_angular_velocity']:.3f} rad/s")
+            # print(f"Body rotation calculated: {len(trunk_rotation)} frames")
+            # print(f"Rotation range: {features['rotation_range']:.2f} degrees")
+            # print(f"Peak angular velocity: {features['peak_angular_velocity']:.3f} rad/s")
             
         else:
-            print("Missing shoulder landmarks for body rotation calculation")
-            print(f"Available columns: {[col for col in data.columns if 'Shoulder' in col]}")
+            # print("Missing shoulder landmarks for body rotation calculation")
+            # print(f"Available columns: {[col for col in data.columns if 'Shoulder' in col]}")
             # Return zero arrays as fallback
             num_frames = len(data)
             features['trunk_rotation'] = np.zeros(num_frames)
@@ -233,7 +233,7 @@ def extract_body_rotation_features(data):
             features['peak_angular_velocity'] = 0.0
             
     except Exception as e:
-        print(f"Error in body rotation calculation: {e}")
+        # print(f"Error in body rotation calculation: {e}")
         # Fallback to zeros
         num_frames = len(data)
         features['trunk_rotation'] = np.zeros(num_frames)
@@ -306,10 +306,10 @@ def extract_limb_velocities(data):
                 segment_data = np.array([get_3d_position(pos) for pos in data[column_name]])
                 velocities[segment_name] = np.gradient(segment_data, axis=0)
             except Exception as e:
-                print(f"Warning: Could not calculate velocity for {segment_name}: {e}")
+                # print(f"Warning: Could not calculate velocity for {segment_name}: {e}")
                 velocities[segment_name] = np.zeros((len(data), 3))
         else:
-            print(f"Warning: Column {column_name} not found for segment {segment_name}")
+            # print(f"Warning: Column {column_name} not found for segment {segment_name}")
             velocities[segment_name] = np.zeros((len(data), 3))
     
     return velocities
@@ -350,7 +350,7 @@ def extract_kinetic_chain_patterns(data):
             patterns['chain_efficiency'] = calculate_chain_efficiency(data)
             patterns['coordination_score'] = calculate_coordination_score(data)
             
-            print(f"Kinetic chain analysis: racket timing = {racket_timing:.1f}% of stroke")
+            # print(f"Kinetic chain analysis: racket timing = {racket_timing:.1f}% of stroke")
             
         else:
             print("No racket data available for kinetic chain analysis")
@@ -361,7 +361,7 @@ def extract_kinetic_chain_patterns(data):
             patterns['coordination_score'] = 0.0
             
     except Exception as e:
-        print(f"Error in kinetic chain analysis: {e}")
+        # print(f"Error in kinetic chain analysis: {e}")
         # Fallback values
         patterns['racket_tip_timing'] = 50.0
         patterns['racket_tip_activation'] = True
