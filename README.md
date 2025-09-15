@@ -1,6 +1,6 @@
 # Talking Tennis: Causal Language Feedback from 3D Biomechanical Action Recognition
 
-This project aims to develop a pipeline for classifying tennis strokes using 3D motion data. The pipeline incorporates components for data loading, feature extraction, action recognition, and feedback generation using a large language model (LLM).
+This project aims to develop a pipeline for classifying tennis strokes using 3D motion data. The pipeline incorporates components for data loading, feature extraction, action recognition, and feedback generation using a large language model (LLM). Mentored by Nyx Iskander @ UC Berkeley. 
 
 ## Project Structure
 
